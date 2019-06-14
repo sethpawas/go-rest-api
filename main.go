@@ -1,46 +1,106 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
-	. "github.com/asahasrabuddhe/rest-api/logger"
+	"github.com/asahasrabuddhe/rest-api/logger"
+	"github.com/asahasrabuddhe/rest-api/renderers"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/render"
 	"github.com/sirupsen/logrus"
-	"html"
+	"google.golang.org/genproto/googleapis/type/date"
 	"net/http"
-	"time"
 )
 
+type Expense struct {
+	Id          int       `json:"id"`
+	Description string    `json:"description"`
+	Type        string    `json:"type"`
+	Amount      float64   `json:"amount"`
+	CreatedOn   date.Date `json:"created_on" `
+	UpdatedOn   date.Date `json:"updated_on"`
+}
+
+func (e *Expense) Bind(r *http.Request) error {
+	return nil
+}
+
+func (e *Expense) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+type Expenses []Expense
+
+var expenses Expenses
+
 func main() {
-	logger := logrus.New()
+	log := logrus.New()
+
+	log.SetFormatter(&logrus.JSONFormatter{
+		DisableTimestamp: true,
+		PrettyPrint:      true,
+	})
 
 	r := chi.NewRouter()
-	logger.Formatter = &logrus.JSONFormatter{
-		// disable, as we set our own
-		DisableTimestamp: true,
-	}
 
-	// A good base middleware stack
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(NewStructuredLogger(logger))
+	r.Use(logger.NewStructuredLogger(log))
 	r.Use(middleware.Recoverer)
 
-	r.Use(middleware.Timeout(60 * time.Second))
+	r.Route("/expenses", func(r chi.Router) {
+		r.Post("/", CreateExpense)
+		r.Get("/", ListAllExpense)
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
+		r.Route("/{id}", func(r chi.Router) {
+			r.Get("/", ListOneExpense)
+			r.Put("/", UpdateExpense)
+			r.Delete("/", DeleteExpense)
+		})
 	})
 
-	r.Get("/wait", func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(1 * time.Second)
-		LogEntrySetField(r, "wait", true)
-		_, _ = fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
-	})
+	log.Fatal(http.ListenAndServe(":8080", r))
+}
 
-	r.Get("/panic", func(w http.ResponseWriter, r *http.Request) {
-		panic("oops")
-	})
+func CreateExpense(writer http.ResponseWriter, request *http.Request) {
+	var expense Expense
 
-	logger.Fatal(http.ListenAndServe(":8080", r))
+	err := render.Bind(request, &expense)
+	if err != nil {
+		_ = render.Render(writer, request, &renderers.ErrorResponse{
+			HTTPStatusCode: http.StatusUnprocessableEntity,
+			Err:            errors.New("cound not parse json request"),
+		})
+		return
+	}
+
+	expenses = append(expenses, expense)
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusCreated)
+
+	_, _ = fmt.Fprintln(writer, `{"success": true}`)
+}
+
+func ListOneExpense(writer http.ResponseWriter, request *http.Request) {
+
+}
+
+func ListAllExpense(writer http.ResponseWriter, request *http.Request) {
+	encoder := json.NewEncoder(writer)
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+
+	_ = encoder.Encode(expenses)
+}
+
+func UpdateExpense(writer http.ResponseWriter, request *http.Request) {
+
+}
+
+func DeleteExpense(writer http.ResponseWriter, request *http.Request) {
+
 }
