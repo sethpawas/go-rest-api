@@ -3,26 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/asahasrabuddhe/rest-api/requests"
+	"github.com/asahasrabuddhe/rest-api/types"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"google.golang.org/genproto/googleapis/type/date"
-	"io/ioutil"
+	"github.com/go-chi/render"
 	"log"
 	"net/http"
 )
 
-type Expense struct {
-	Id          int       `json:"id"`
-	Description string    `json:"description"`
-	Type        string    `json:"type"`
-	Amount      float64   `json:"amount"`
-	CreatedOn   date.Date `json:"created_on" `
-	UpdatedOn   date.Date `json:"updated_on"`
-}
-
-type Expenses []Expense
-
-var expenses Expenses
+var expenses types.Expenses
 
 func main() {
 	r := chi.NewRouter()
@@ -31,6 +21,7 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(render.SetContentType(render.ContentTypeJSON))
 
 	r.Route("/expenses", func(r chi.Router) {
 		r.Post("/", CreateExpense)
@@ -47,38 +38,21 @@ func main() {
 }
 
 func CreateExpense(writer http.ResponseWriter, request *http.Request) {
-	b, err := ioutil.ReadAll(request.Body)
+	var req requests.CreateExpenseRequest
+
+	err := render.Bind(request, &req)
 	if err != nil {
-		http.Error(writer, "unable to read request body", 500)
+		log.Println(err)
+		return
 	}
 
-	var data map[string]interface{}
+	expenses = append(expenses, *req.Expense)
 
-	err = json.Unmarshal(b, &data)
-	if err != nil {
-		http.Error(writer, "unable to parse json request body", 422)
-	}
-
-	expense := new(Expense)
-
-	if val, ok := data["description"].(string); ok {
-		expense.Description = val
-	}
-
-	if val, ok := data["type"].(string); ok {
-		expense.Type = val
-	}
-
-	if val, ok := data["amount"].(float64); ok {
-		expense.Amount = val
-	}
-
-	expenses = append(expenses, *expense)
-
+	j, _ := json.Marshal(req.Expense)
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 
-	_, _ = fmt.Fprintln(writer, `{"success": true}`)
+	_, _ = fmt.Fprintf(writer, `{"success": true, "data": %v}`, string(j))
 }
 
 func ListOneExpense(writer http.ResponseWriter, request *http.Request) {
