@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/asahasrabuddhe/rest-api/expenses"
-	expenseRoutes "github.com/asahasrabuddhe/rest-api/expenses/routes"
-	"github.com/asahasrabuddhe/rest-api/logger"
-	"github.com/asahasrabuddhe/rest-api/router"
+	"github.com/sethpawas/go-rest-api/expenses"
+	expenseRoutes "github.com/asahasrabuddhe/go-rest-api/expenses/routes"
+	"github.com/sethpawas/go-rest-api/logger"
+	"github.com/sethpawas/go-rest-api/router"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
